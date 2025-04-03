@@ -15,7 +15,7 @@ exports.createProduct = async (req, res, next) => {
 // 📌 Get All Products
 exports.getAllProducts = async (req, res, next) => {
     try {
-        const products = await Product.find();
+        const products = await Product.find({ type: "open" });
         return successResponse(res, products, "Products retrieved successfully");
     } catch (error) {
         next(error);

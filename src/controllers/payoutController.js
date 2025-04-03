@@ -1,4 +1,5 @@
 const Payout = require('../models/Payout');
+const Bank = require('../models/Bank');
 const Charger = require('../models/Charger');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 
