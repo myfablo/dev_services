@@ -16,7 +16,7 @@ const ProductSchema = new mongoose.Schema({
     dimensions: { type: String },
     machineImage: { type: String }, // Image URL
     price: { type: Number, required: true },
-    type: { type: String, enum: ["open", "closed"], default: "open" }
+    type: { type: String, enum: ["open", "closed"], default: "open" },
     surplusAmount: { type: Number, required: true }, // Monthly surplus
     timestamps: { type: Date, default: Date.now }
 });
