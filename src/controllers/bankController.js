@@ -4,9 +4,9 @@ const { successResponse, errorResponse } = require('../utils/responseHelper');
 // 📌 Add or Update Bank Details
 exports.addOrUpdateBankDetails = async (req, res, next) => {
     try {
-        const { customerId, nameOnAccount, bankName, accountNumber, ifscCode, bankBranch } = req.body;
+        const { customerId, nameOnAccount, accountNumber, ifscCode } = req.body;
 
-        if (!customerId || !nameOnAccount || !bankName || !accountNumber || !ifscCode || !bankBranch) {
+        if (!customerId || !nameOnAccount || !accountNumber || !ifscCode) {
             return errorResponse(res, "Missing fields", "All fields are required", 400);
         }
 
@@ -15,17 +15,15 @@ exports.addOrUpdateBankDetails = async (req, res, next) => {
         if (existingBank) {
             // Update existing bank details
             existingBank.nameOnAccount = nameOnAccount;
-            existingBank.bankName = bankName;
             existingBank.accountNumber = accountNumber;
             existingBank.ifscCode = ifscCode;
-            existingBank.bankBranch = bankBranch;
             await existingBank.save();
 
             return successResponse(res, existingBank, "Bank details updated successfully");
         }
 
         // Create new bank details
-        const bank = new Bank({ customerId, nameOnAccount, bankName, accountNumber, ifscCode, bankBranch });
+        const bank = new Bank({ customerId, nameOnAccount, accountNumber, ifscCode });
         await bank.save();
 
         return successResponse(res, bank, "Bank details added successfully", 201);

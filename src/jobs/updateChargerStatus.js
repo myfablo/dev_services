@@ -57,6 +57,6 @@ const updateChargerStatus = async () => {
 };
 
 // Run the job every 4 hours
-setInterval(updateChargerStatus, 4 * 60 * 60 * 1000); // 4 hours in milliseconds
+setInterval(updateChargerStatus, 1 * 60 * 60 * 1000); // 4 hours in milliseconds
 
 module.exports = updateChargerStatus;

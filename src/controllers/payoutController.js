@@ -36,47 +36,90 @@ exports.getPayoutsByCustomerId = async (req, res, next) => {
     }
 };
 
-// 📌 Process Automated Payout for All Customers on Payout Day (10th & 24th)
-exports.processPayoutForAll = async (req, res, next) => {
+const getNextPayoutDate = () => {
+    const today = new Date();
+    const day = today.getDate();
+
+    if (day <= 10) return new Date(today.getFullYear(), today.getMonth(), 10); // Next 10th
+    if (day <= 24) return new Date(today.getFullYear(), today.getMonth(), 24); // Next 24th
+    
+    // If past 24th, set to next month's 10th
+    return new Date(today.getFullYear(), today.getMonth() + 1, 10);
+};
+
+const getDaysUntilNextPayout = (fromDate) => {
+    const nextPayoutDate = getNextPayoutDate();
+    return Math.ceil((nextPayoutDate - fromDate) / (1000 * 60 * 60 * 24));
+};
+
+// 📌 Process Bulk Payouts and Update Surplus
+exports.processBulkPayouts = async (req, res, next) => {
     try {
-        const today = new Date();
-        const isPayoutDay = today.getDate() === 10 || today.getDate() === 24;
+        // Fetch all pending payouts
+        const pendingPayouts = await Payout.find({ status: "pending" });
 
-        if (!isPayoutDay) {
-            return errorResponse(res, "Not a payout day", "Payouts can only be processed on the 10th and 24th", 400);
+        if (!pendingPayouts.length) {
+            return errorResponse(res, "No pending payouts", "No transactions to process", 404);
         }
 
-        // Get all chargers
-        const chargers = await Charger.find();
-        if (!chargers.length) {
-            return errorResponse(res, "No chargers found", "No machines available", 404);
-        }
+        let processedPayouts = [];
+        let failedPayouts = [];
 
-        // Process payouts for each customer
-        for (let charger of chargers) {
-            const amount = charger.currentSurplus;
-            if (amount > 0) {
-                // Create payout
-                await new Payout({
-                    customerId: charger.customerId,
-                    reason: "Surplus Payout",
-                    amount: amount,
-                    status: "processed"
-                }).save();
+        for (let payout of pendingPayouts) {
+            // Fetch customer bank details
+            const bankDetails = await Bank.findOne({ customerId: payout.customerId });
 
-                // Reset currentSurplus after payout
-                charger.totalSurplus += amount;
-                charger.currentSurplus = 0;
-                await charger.save();
+            if (!bankDetails) {
+                failedPayouts.push({ payoutId: payout._id, reason: "Missing bank details" });
+                continue;
+            }
+
+            // Simulate payout processing (Replace with real payment API)
+            const isSuccess = Math.random() > 0.1; // 90% success rate simulation
+
+            if (isSuccess) {
+                // Mark as processed
+                payout.status = "processed";
+                payout.updatedAt = new Date();
+                await payout.save();
+                processedPayouts.push({
+                    payoutId: payout._id,
+                    customerId: payout.customerId,
+                    amount: payout.amount,
+                    status: "processed",
+                    bankDetails: {
+                        name: bankDetails.nameOnAccount,
+                        bankName: bankDetails.bankName,
+                        accountNumber: bankDetails.accountNumber,
+                        ifscCode: bankDetails.ifscCode
+                    }
+                });
+
+                // 📌 Update Charger Surplus for the Next Payout Cycle
+                const chargers = await Charger.find({ customerId: payout.customerId }).populate("productId");
+
+                for (let charger of chargers) {
+                    if (!charger.productId) continue;
+
+                    // Calculate daily surplus
+                    const dailySurplus = (charger.productId.surplusAmount / 12) / 30;
+                    const daysUntilNextPayout = getDaysUntilNextPayout(new Date());
+
+                    // Update charger surplus to reflect next cycle
+                    charger.totalSurplus += charger.currentSurplus; // Add old surplus to total
+                    charger.currentSurplus = (dailySurplus * daysUntilNextPayout).toFixed(2);
+                    await charger.save();
+                }
+            } else {
+                failedPayouts.push({ payoutId: payout._id, reason: "Payment gateway error" });
             }
         }
 
-        return successResponse(res, null, "Payouts processed successfully for all customers.");
+        return successResponse(res, { processedPayouts, failedPayouts }, "Bulk payouts processed successfully, surplus updated.");
     } catch (error) {
         next(error);
     }
 };
-
 
 // 📌 Bulk Create Payout Requests for All Eligible Customers (Handling Multiple Chargers)
 exports.bulkCreatePayouts = async (req, res, next) => {
